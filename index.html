@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>我的家庭厨房 Agent · 今天吃什么</title>
+<meta name="description" content="填写今天买到的食材、家中调料、用餐人数、忌口和可用时间，立刻生成菜单、食材用量、备菜顺序和详细做法。" />
+<meta name="theme-color" content="#faf5ec" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%238f3d1c'/%3E%3Cpath d='M7 15h18v3a7 7 0 0 1-7 7h-4a7 7 0 0 1-7-7z' fill='none' stroke='%23faf5ec' stroke-width='2'/%3E%3Cpath d='M16 12c0-3 3-3 3-6' fill='none' stroke='%23faf5ec' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 40 40" aria-label="我的家庭厨房 Agent 标志" role="img">
+      <path d="M6 18h28v5a11 11 0 0 1-11 11h-6A11 11 0 0 1 6 23z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M34 20h3.5a2.5 2.5 0 0 1 0 5H34" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M20 14c0-4 4-3.5 4-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M13 14c0-3 3-2.6 3-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>
+    </svg>
+    <div class="brand-text">
+      <strong>我的家庭厨房</strong>
+      <span>今天买了什么，就做什么</span>
+    </div>
+  </div>
+  <button id="themeBtn" class="icon-btn" type="button" aria-label="切换深色模式">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" stroke-linecap="round"/></svg>
+  </button>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>今天吃什么，交给厨房 Agent</h1>
+    <p>填好下面五个板块，立刻拿到<strong>菜单、食材用量、备菜顺序和详细步骤</strong>，尽量把手里的食材用完，少跑一趟超市。也可直接用自然语言向 Agent 提问。</p>
+  </section>
+
+  <section class="card agent-panel" id="agentPanel">
+    <div class="card-head">
+      <span class="num">AI</span>
+      <div>
+        <h2>对话式 Agent</h2>
+        <p class="hint">填写 DeepSeek / OpenAI 兼容接口后，用自然语言提问；会调用本地菜谱引擎，不编造菜品</p>
+      </div>
+    </div>
+    <div class="field-grid">
+      <label class="field">
+        <span>API Base URL</span>
+        <input id="apiBase" type="url" autocomplete="off" placeholder="https://api.deepseek.com" />
+      </label>
+      <label class="field">
+        <span>API Key</span>
+        <input id="apiKey" type="password" autocomplete="off" placeholder="sk-…" />
+      </label>
+      <label class="field">
+        <span>模型</span>
+        <input id="apiModel" type="text" autocomplete="off" placeholder="deepseek-chat" />
+      </label>
+    </div>
+    <label class="field">
+      <span>向 Agent 提问</span>
+      <textarea id="agentAsk" rows="3" placeholder="例如：家里有番茄、鸡蛋、豆腐，两个人，素食，45 分钟内能做什么？"></textarea>
+    </label>
+    <div class="row-actions">
+      <button type="button" class="primary agent-ask-btn" id="agentAskBtn">向 Agent 提问</button>
+    </div>
+    <p class="hint" id="agentStatus" aria-live="polite"></p>
+    <div id="agentReply" class="agent-reply" hidden></div>
+  </section>
+
+  <form id="form" novalidate>
+    <!-- 板块 1 -->
+    <section class="card" id="sec-ing">
+      <div class="card-head">
+        <span class="num">1</span>
+        <div>
+          <h2>今天买到的食材</h2>
+          <p class="hint">用逗号或换行分隔，例如：番茄，鸡蛋，五花肉，西兰花</p>
+        </div>
+      </div>
+      <textarea id="ingredients" rows="3" placeholder="番茄, 鸡蛋, 猪肉, 西兰花, 土豆"></textarea>
+      <p class="sub">常买食材，点一下就能加入：</p>
+      <div class="chips clamp" id="ingChips"></div>
+      <button type="button" class="ghost more" id="moreIng" aria-expanded="false">展开全部常买食材</button>
+      <p class="counter" id="ingCount">已录入 0 种食材</p>
+    </section>
+
+    <!-- 板块 2 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num">2</span>
+        <div>
+          <h2>家中已有调料</h2>
+          <p class="hint">点亮你家里有的，缺的会自动列进补货清单</p>
+        </div>
+      </div>
+      <div class="chips" id="seasonChips"></div>
+      <div class="row-actions">
+        <button type="button" class="ghost" data-season="all">全选</button>
+        <button type="button" class="ghost" data-season="basic">只留基础</button>
+        <button type="button" class="ghost" data-season="none">全部清空</button>
+      </div>
+    </section>
+
+    <!-- 板块 3 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num">3</span>
+        <div>
+          <h2>用餐人数</h2>
+          <p class="hint">用量与菜品数量会按人数自动调整</p>
+        </div>
+      </div>
+      <div class="stepper">
+        <button type="button" id="minus" aria-label="减少人数">−</button>
+        <div class="count"><span id="peopleVal">2</span><small>人</small></div>
+        <button type="button" id="plus" aria-label="增加人数">＋</button>
+      </div>
+    </section>
+
+    <!-- 板块 4 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num">4</span>
+        <div>
+          <h2>忌口与偏好</h2>
+          <p class="hint">可多选，不选表示什么都能吃</p>
+        </div>
+      </div>
+      <div class="chips" id="tabooChips"></div>
+    </section>
+
+    <!-- 板块 5 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num">5</span>
+        <div>
+          <h2>今天能做多久</h2>
+          <p class="hint">包含备菜时间，Agent 会据此安排能并行的菜</p>
+        </div>
+      </div>
+      <div class="chips seg" id="timeChips"></div>
+    </section>
+
+    <div class="actions">
+      <button type="submit" class="primary" id="genBtn">生成今天的菜谱</button>
+      <button type="button" class="ghost wide" id="resetBtn">清空重填</button>
+    </div>
+  </form>
+
+  <section id="output" aria-live="polite"></section>
+
+  <footer class="foot">
+    <p>菜谱与用量为家常参考值，请按实际食材大小和口味微调。生鲜请确认彻底煮熟。</p>
+  </footer>
+</main>
+
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script src="agent.js"></script>
+<script src="app.js"></script>
+<script data-pplx-inline-edit>
+(function () {
+  if (window === window.top) return;
+
+  const allowedParentOrigins = ["https://www.perplexity.ai","https://perplexity.ai","https://testing.perplexity.ai","https://staging.perplexity.ai","https://*.preview.i.perplexity.ai","http://perplexity.localhost","http://localhost:1420","http://127.0.0.1:1420","http://localhost:3000","http://127.0.0.1:3000","http://localhost:5173","http://127.0.0.1:5173"];
+  const MAX_FONT_BYTES = 500 * 1024;
+  const MAX_TOTAL_FONT_BYTES = 2 * 1024 * 1024;
+  let scrollForwarding = false;
+  let scrollRaf = 0;
+  let trustedTopOrigin = null;
+
+  // Allow entries like "https://*.preview.i.perplexity.ai" — the wildcard
+  // matches a single DNS label (no dots), so "https://*.foo" cannot stretch
+  // across multiple labels.
+  function matchesAllowedOrigin(origin) {
+    if (!origin) return false;
+    for (const entry of allowedParentOrigins) {
+      if (!entry.includes("*")) {
+        if (entry === origin) return true;
+        continue;
+      }
+      const pattern = new RegExp(
+        "^" +
+          entry.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^.]+") +
+          "$",
+      );
+      if (pattern.test(origin)) return true;
+    }
+    return false;
+  }
+
+  // Trust decision: when the sender is same-origin-visible (event.origin is a
+  // real origin like https://www.perplexity.ai) we trust event.origin directly.
+  // When event.origin is "null" (opaque broker srcdoc), we fall back to the
+  // broker's stamped `parentOrigin` to identify the top window. The fallback
+  // is claim-only — we rely on the browser's native `targetOrigin` enforcement
+  // on the response path (see postToTrustedTop) to ensure replies can't be
+  // delivered to anyone but the actual top window of that claimed origin.
+  function getTrustedParentOrigin(event) {
+    const forwardedParentOrigin =
+      typeof event.data.parentOrigin === "string" ? event.data.parentOrigin : null;
+    const parentOrigin = event.origin === "null" ? forwardedParentOrigin : event.origin;
+    return matchesAllowedOrigin(parentOrigin) ? parentOrigin : null;
+  }
+
+  // All responses go to window.top with targetOrigin = the allowlisted origin.
+  // An attacker that iframes us inside their own null-origin broker can claim
+  // any parentOrigin they like, but the browser will drop the reply whenever
+  // the real top's origin doesn't match — so the screenshot never leaves.
+  function postToTrustedTop(message) {
+    if (!trustedTopOrigin) return;
+    try {
+      window.top.postMessage(message, trustedTopOrigin);
+    } catch (_error) {}
+  }
+
+  function inlineAll(original, clone) {
+    if (original.nodeType !== 1 || clone.nodeType !== 1) return;
+
+    try {
+      const computedStyle = getComputedStyle(original);
+      // cssText on a computed style is the serialized declaration in modern
+      // Chromium/Safari — a single read beats enumerating ~400 longhand
+      // properties. Firefox returns "" here, so we fall back on empty.
+      const serialized = computedStyle.cssText;
+      if (serialized) {
+        clone.style.cssText = serialized;
+      } else {
+        const parts = new Array(computedStyle.length);
+        for (let index = 0; index < computedStyle.length; index += 1) {
+          const property = computedStyle[index];
+          parts[index] = `${property}:${computedStyle.getPropertyValue(property)};`;
+        }
+        clone.style.cssText = parts.join("");
+      }
+    } catch (_error) {}
+
+    const originalChildren = original.children;
+    const clonedChildren = clone.children;
+    for (
+      let index = 0;
+      index < originalChildren.length && index < clonedChildren.length;
+      index += 1
+    ) {
+      inlineAll(originalChildren[index], clonedChildren[index]);
+    }
+  }
+
+  function extractFontUrl(srcValue) {
+    const matches = [
+      ...srcValue.matchAll(
+        /url\(["']?([^"')]+)["']?\)(?:\s*format\(["']?([^"')]+)["']?\))?/gi,
+      ),
+    ];
+    if (matches.length === 0) return null;
+    const woff2 = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff2"));
+    if (woff2) return woff2[1];
+    const woff = matches.find((m) => m[2] && m[2].toLowerCase().includes("woff"));
+    if (woff) return woff[1];
+    return matches[0][1];
+  }
+
+  // Cache resolved font URL -> data URI across captures. Fonts on a page
+  // essentially never change, and a batch run emits multiple captures back to
+  // back — without this we'd refetch + re-base64 every time.
+  const fontDataUriCache = new Map();
+  const SRC_DECLARATION_RE = /src\s*:\s*[^;}]+/i;
+
+  async function fetchAsDataUri(url) {
+    if (fontDataUriCache.has(url)) return fontDataUriCache.get(url);
+    let dataUri = null;
+    try {
+      const response = await fetch(url, { mode: "cors", credentials: "omit" });
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size <= MAX_FONT_BYTES) {
+          dataUri = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () =>
+              resolve(typeof reader.result === "string" ? reader.result : null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    } catch (_error) {
+      dataUri = null;
+    }
+    fontDataUriCache.set(url, dataUri);
+    return dataUri;
+  }
+
+  function collectFontFaceRuleTexts() {
+    const rules = [];
+    for (const sheet of document.styleSheets) {
+      let cssRules;
+      try {
+        cssRules = sheet.cssRules;
+      } catch (_error) {
+        continue;
+      }
+      if (!cssRules) continue;
+      for (const rule of cssRules) {
+        const cssText = rule.cssText || "";
+        if (cssText.startsWith("@font-face")) rules.push(cssText);
+      }
+    }
+    return rules;
+  }
+
+  async function buildInlinedFontCss() {
+    const ruleTexts = collectFontFaceRuleTexts();
+    if (ruleTexts.length === 0) return null;
+
+    const resolved = ruleTexts.map((cssText) => {
+      if (!SRC_DECLARATION_RE.test(cssText)) return null;
+      const srcMatch = cssText.match(/src\s*:\s*([^;}]+)[;}]/i);
+      if (!srcMatch) return null;
+      const url = extractFontUrl(srcMatch[1]);
+      if (!url) return null;
+      try {
+        return { cssText, url: new URL(url, document.baseURI).href };
+      } catch (_error) {
+        return null;
+      }
+    });
+
+    const dataUris = await Promise.all(
+      resolved.map((entry) => (entry ? fetchAsDataUri(entry.url) : Promise.resolve(null))),
+    );
+
+    const inlined = [];
+    let totalBytes = 0;
+    for (let index = 0; index < resolved.length; index += 1) {
+      const entry = resolved[index];
+      const dataUri = dataUris[index];
+      if (!entry || !dataUri) continue;
+      const approxBytes = dataUri.length * 0.75;
+      if (totalBytes + approxBytes > MAX_TOTAL_FONT_BYTES) break;
+      totalBytes += approxBytes;
+      inlined.push(entry.cssText.replace(SRC_DECLARATION_RE, `src: url("${dataUri}")`));
+    }
+    return inlined.length > 0 ? inlined.join("\n") : null;
+  }
+
+  function stripExternal(clone) {
+    const images = clone.querySelectorAll("img");
+    for (let index = 0; index < images.length; index += 1) {
+      const src = images[index].getAttribute("src");
+      if (src && !src.startsWith("data:")) images[index].removeAttribute("src");
+    }
+
+    const elements = clone.querySelectorAll("*");
+    for (let index = 0; index < elements.length; index += 1) {
+      const style = elements[index].style.cssText;
+      if (style && style.includes("url(")) {
+        elements[index].style.cssText = style.replace(
+          /url\(["']?(?!data:)[^)"']*["']?\)/gi,
+          "none",
+        );
+      }
+    }
+  }
+
+  function emitScroll() {
+    scrollRaf = 0;
+    if (!scrollForwarding) return;
+    postToTrustedTop({
+      type: "INLINE_EDIT_SCROLL",
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+    });
+  }
+
+  window.addEventListener(
+    "scroll",
+    function () {
+      if (!scrollForwarding || scrollRaf) return;
+      scrollRaf = requestAnimationFrame(emitScroll);
+    },
+    { passive: true, capture: true },
+  );
+
+  async function handleCaptureRequest(event) {
+    const requestId = event.data.requestId;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    function postResult(dataUrl) {
+      postToTrustedTop({
+        type: "INLINE_EDIT_SCREENSHOT_RESULT",
+        requestId,
+        dataUrl,
+        scrollX,
+        scrollY,
+      });
+    }
+
+    try {
+      // Wait for any pending web fonts to resolve so both inline metrics and
+      // the @font-face inlining below see the same loaded faces.
+      if (document.fonts && document.fonts.ready) {
+        try {
+          await document.fonts.ready;
+        } catch (_error) {}
+      }
+
+      const clone = document.documentElement.cloneNode(true);
+      inlineAll(document.documentElement, clone);
+
+      const removedNodes = clone.querySelectorAll("script,link[rel=\"stylesheet\"],style");
+      for (let index = 0; index < removedNodes.length; index += 1) {
+        removedNodes[index].remove();
+      }
+
+      stripExternal(clone);
+
+      // Re-embed web fonts as data-URI @font-face rules so the SVG rasterizer
+      // can resolve them — external font URLs aren't fetched during
+      // foreignObject rendering, which would otherwise force a fallback face
+      // and change text metrics.
+      const inlinedFontCss = await buildInlinedFontCss();
+      if (inlinedFontCss) {
+        const styleEl = document.createElement("style");
+        styleEl.textContent = inlinedFontCss;
+        const head = clone.querySelector("head");
+        if (head) head.appendChild(styleEl);
+        else clone.insertBefore(styleEl, clone.firstChild);
+      }
+
+      const html = new XMLSerializer().serializeToString(clone);
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+        '<foreignObject width="100%" height="100%">' +
+        `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;overflow:hidden">` +
+        `<div style="position:relative;left:-${scrollX}px;top:-${scrollY}px">` +
+        html +
+        "</div></div></foreignObject></svg>";
+      const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      const image = new Image();
+      image.onload = function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(image, 0, 0);
+        postResult(canvas.toDataURL("image/png"));
+      };
+      image.onerror = function () {
+        postResult(null);
+      };
+      image.src = svgUrl;
+    } catch (_error) {
+      postResult(null);
+    }
+  }
+
+  window.addEventListener("message", function (event) {
+    if (!event.data) return;
+    // Only accept messages from the direct parent frame. Blocks sibling /
+    // unrelated-window postMessage senders that could otherwise reach us.
+    if (event.source !== window.parent) return;
+
+    const trustedParentOrigin = getTrustedParentOrigin(event);
+    if (!trustedParentOrigin) return;
+    trustedTopOrigin = trustedParentOrigin;
+
+    if (event.data.type === "INLINE_EDIT_SCROLL_START") {
+      scrollForwarding = true;
+      emitScroll();
+      return;
+    }
+
+    if (event.data.type === "INLINE_EDIT_SCROLL_STOP") {
+      scrollForwarding = false;
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      scrollRaf = 0;
+      return;
+    }
+
+    if (event.data.type !== "INLINE_EDIT_CAPTURE_REQUEST") return;
+
+    handleCaptureRequest(event);
+  });
+})();
+
+
+</script></body>
+</html>
